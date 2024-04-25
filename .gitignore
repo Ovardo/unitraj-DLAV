@@ -1,3 +1,4 @@
+# Notadding various big/generated files
 motionnet/lightning_logs/
 motionnet/checkpoints/
 motionnet/data_samples/dlav_data
@@ -5,7 +6,6 @@ motionnet/outputs/
 motionnet/motionnet/
 motionnet/tmp/
 motionnet/wandb/
-
 
 mjau.out
 
