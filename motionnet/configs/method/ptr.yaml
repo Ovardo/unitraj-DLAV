@@ -13,10 +13,11 @@ use_FDEADE_aux_loss: True
 
 # train
 max_epochs: 100 
-learning_rate: 0.00075 
-learning_rate_sched: [10, 20, 30, 40, 50]
+learning_rate: 0.0005 # 0.00075
+learning_rate_sched: [10, 20, 30, 45, 60]
 optimizer: Adam 
-scheduler: multistep 
+weight_decay: 1.e-5
+scheduler: cos 
 ewc_lambda: 2000
 train_batch_size: 128 
 eval_batch_size: 256 

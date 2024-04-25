@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from motionnet.models.base_model.base_model import BaseModel
-from torch.optim.lr_scheduler import MultiStepLR
+from torch.optim.lr_scheduler import MultiStepLR, CosineAnnealingLR, CosineAnnealingWarmRestarts
 from torch import optim
 from scipy import special
 from torch.distributions import MultivariateNormal, Laplace
@@ -264,7 +264,63 @@ class PTR(BaseModel):
         :return: (T, B, N, H)
         '''
         ######################## Your code here ########################
-        pass
+        T, B, N, H = agents_emb.size()
+
+        agents_emb = agents_emb.reshape(T, B*N, H) 
+        agents_emb = self.pos_encoder.forward(agents_emb)
+        
+        # print("BEFORE")
+        # for b in range(5):
+        #     print(f'BATCH: {b}')
+        #     print(f'AGENT_MASKS (B,T,N):\n {agent_masks[b].int()}')
+
+        # invalid_indices = (torch.all(agents_emb == 0, dim=3)).permute(1,0,2) 
+        # print(f'UNIQUE: {torch.unique(invalid_indices)}')
+        
+        # print(f'invalid_nidiceis {invalid_indices.shape}')
+        # print(f'agent_masks: {agent_masks.shape}')
+        # agent_masks[invalid_indices] = True
+
+        # # Sum all elements along the last dimension
+        # sum_H = agents_emb.sum(dim=-1)
+
+        # # Check if sum_H is zero
+        # indices_zero_H = torch.nonzero(sum_H == 0, as_tuple=False)
+        
+        # agent_masks[indices_zero_H[:, 1], :, indices_zero_H[:,2]] = True
+
+        # Set first timestep of all masks to False as quick fix to avoid NaN from softmax
+        
+        agent_masks[:,0,:] = False
+
+        # # Sum all elements along the last dimension
+        #sum_mask = agent_masks.sum(dim=1)
+
+        # # Check if sum_H is zero
+        #indices_zero_mask = torch.nonzero(sum_mask == 0, as_tuple=False)
+
+        # print("AFTER")
+        # for b in range(5):
+        #     print(f'BATCH: {b}')
+        #     print(f'AGENT_MASKS (B,T,N):\n {agent_masks[b].int()}')
+
+
+        # Positional encoding
+        #agents_emb = self.pos_encoder.forward(agents_emb)
+        
+        agent_masks = agent_masks.permute(1, 0, 2) # T, B, N
+        agent_masks = agent_masks.reshape(T, B*N).T # B*N, T
+
+        # agent_masks = agent_masks.permute(1, 2, 0) # T, N, B
+        # agent_masks = agent_masks.reshape(T, N*B) # N*B, 
+
+        # agent_masks = agent_masks.permute(0, 2, 1) # B, N, T
+        # agent_masks = agent_masks.reshape(B*N, T) # B*N, T
+    
+        agents_emb = layer(agents_emb, src_key_padding_mask=agent_masks) # T, B*N, H
+        #agents_emb = layer(agents_emb)
+        
+        agents_emb = agents_emb.view(T, B, N, H) # T, B, N, H
         ################################################################
         return agents_emb
 
@@ -278,7 +334,15 @@ class PTR(BaseModel):
         :return: (T, B, N, H)
         '''
         ######################## Your code here ########################
-        pass
+        T, B, N, H = agents_emb.size()
+        
+        agents_emb = agents_emb.permute(2, 1, 0, 3) # N, B, T, H
+        agents_emb = agents_emb.reshape(N, B*T, H) # N, B*T, H
+
+        agents_emb = layer(agents_emb)
+
+        agents_emb = agents_emb.view(N, B, T, H) # N, B, T, H
+        agents_emb = agents_emb.permute(2, 1, 0, 3) # T, B, N, H
         ################################################################
         return agents_emb
 
@@ -306,7 +370,22 @@ class PTR(BaseModel):
 
         ######################## Your code here ########################
         # Apply temporal attention layers and then the social attention layers on agents_emb, each for L_enc times.
-        pass
+        T, B, N, H = agents_emb.size()
+
+        # Positional encoding
+        # agents_emb = agents_emb.reshape(T, B*N, H) 
+        # agents_emb = self.pos_encoder.forward(agents_emb)
+        # agents_emb = agents_emb.reshape(T, B, N, H)
+
+        
+        for d in range(self.L_enc):
+            #print(f'Before temporal: {torch.isnan(agents_emb).any().item()}')
+            agents_emb = self.temporal_attn_fn(agents_emb, opps_masks, self.temporal_attn_layers[d])
+            #print(f'After temporal before social: {torch.isnan(agents_emb).any().item()}')
+            agents_emb = self.social_attn_fn(agents_emb, opps_masks, self.social_attn_layers[d]) 
+            #print(f'After temporal after social: {torch.isnan(agents_emb).any().item()}')
+
+    
         ################################################################
 
         ego_soctemp_emb = agents_emb[:, :, 0]  # take ego-agent encodings only.
@@ -342,7 +421,9 @@ class PTR(BaseModel):
         output = {}
         output['predicted_probability'] = mode_probs # #[B, c]
         output['predicted_trajectory'] = out_dists.permute(2,0,1,3) # [c, T, B, 5] to [B, c, T, 5] to be able to parallelize code
+        # (f'len NaN: {len(np.argwhere(np.isnan(out_dists.detach().cpu().numpy())))}')
         if len(np.argwhere(np.isnan(out_dists.detach().cpu().numpy()))) > 1:
+            print("BREAKPOINT!!!")
             breakpoint()
         return output
 
@@ -374,9 +455,15 @@ class PTR(BaseModel):
 
 
     def configure_optimizers(self):
-        optimizer = optim.Adam(self.parameters(), lr= self.config['learning_rate'],eps=0.0001)
-        scheduler = MultiStepLR(optimizer, milestones=self.config['learning_rate_sched'], gamma=0.5,
-                                           verbose=True)
+        optimizer = optim.Adam(self.parameters(), lr= self.config['learning_rate'],eps=0.0001, weight_decay = self.config['weight_decay'])
+        if self.config['scheduler'] == 'multistep':
+            scheduler = MultiStepLR(optimizer, milestones=self.config['learning_rate_sched'], gamma=0.5,
+                                            verbose=True)
+        elif self.config['scheduler'] == 'cos':
+            scheduler = CosineAnnealingLR(optimizer, T_max=20, eta_min=0, last_epoch=-1)
+        elif self.config['scheduler'] == 'warm':
+            pass
+            #scheduler = CosineAnnealingWarmRestarts(optimizer, )
         return [optimizer], [scheduler]
 
 

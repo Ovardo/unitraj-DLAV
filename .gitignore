@@ -1,0 +1,20 @@
+motionnet/lightning_logs/
+motionnet/checkpoints/
+motionnet/data_samples/dlav_data
+motionnet/outputs/
+motionnet/motionnet/
+motionnet/tmp/
+motionnet/wandb/
+
+
+mjau.out
+
+# Virtual environment
+venv/
+
+# Compiled Python files
+*.pyc
+__pycache__/
+
+# If you're using pipenv
+Pipfile.lock
