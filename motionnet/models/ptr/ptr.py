@@ -266,60 +266,23 @@ class PTR(BaseModel):
         ######################## Your code here ########################
         T, B, N, H = agents_emb.size()
 
+        # Merging Batch and Agent dimension together in order to do temporal attention
         agents_emb = agents_emb.reshape(T, B*N, H) 
+
+        # Apply position encoding to embbeding based on timestep
         agents_emb = self.pos_encoder.forward(agents_emb)
-        
-        # print("BEFORE")
-        # for b in range(5):
-        #     print(f'BATCH: {b}')
-        #     print(f'AGENT_MASKS (B,T,N):\n {agent_masks[b].int()}')
-
-        # invalid_indices = (torch.all(agents_emb == 0, dim=3)).permute(1,0,2) 
-        # print(f'UNIQUE: {torch.unique(invalid_indices)}')
-        
-        # print(f'invalid_nidiceis {invalid_indices.shape}')
-        # print(f'agent_masks: {agent_masks.shape}')
-        # agent_masks[invalid_indices] = True
-
-        # # Sum all elements along the last dimension
-        # sum_H = agents_emb.sum(dim=-1)
-
-        # # Check if sum_H is zero
-        # indices_zero_H = torch.nonzero(sum_H == 0, as_tuple=False)
-        
-        # agent_masks[indices_zero_H[:, 1], :, indices_zero_H[:,2]] = True
 
         # Set first timestep of all masks to False as quick fix to avoid NaN from softmax
-        
         agent_masks[:,0,:] = False
 
-        # # Sum all elements along the last dimension
-        #sum_mask = agent_masks.sum(dim=1)
-
-        # # Check if sum_H is zero
-        #indices_zero_mask = torch.nonzero(sum_mask == 0, as_tuple=False)
-
-        # print("AFTER")
-        # for b in range(5):
-        #     print(f'BATCH: {b}')
-        #     print(f'AGENT_MASKS (B,T,N):\n {agent_masks[b].int()}')
-
-
-        # Positional encoding
-        #agents_emb = self.pos_encoder.forward(agents_emb)
-        
+        # Reshape mask to allign with shape of agents_emb 
         agent_masks = agent_masks.permute(1, 0, 2) # T, B, N
         agent_masks = agent_masks.reshape(T, B*N).T # B*N, T
 
-        # agent_masks = agent_masks.permute(1, 2, 0) # T, N, B
-        # agent_masks = agent_masks.reshape(T, N*B) # N*B, 
-
-        # agent_masks = agent_masks.permute(0, 2, 1) # B, N, T
-        # agent_masks = agent_masks.reshape(B*N, T) # B*N, T
-    
+        # Apply the temporal tranformer encoder layer
         agents_emb = layer(agents_emb, src_key_padding_mask=agent_masks) # T, B*N, H
-        #agents_emb = layer(agents_emb)
         
+        # Reshape embedding tensor back to original shape
         agents_emb = agents_emb.view(T, B, N, H) # T, B, N, H
         ################################################################
         return agents_emb
@@ -336,11 +299,14 @@ class PTR(BaseModel):
         ######################## Your code here ########################
         T, B, N, H = agents_emb.size()
         
+        # Permuting and merging Batch and Temporal dimension together in order to do social attention
         agents_emb = agents_emb.permute(2, 1, 0, 3) # N, B, T, H
         agents_emb = agents_emb.reshape(N, B*T, H) # N, B*T, H
 
+        # Apply the social transformer encoder layer
         agents_emb = layer(agents_emb)
 
+        # Reshape embedding tensor back to original shape
         agents_emb = agents_emb.view(N, B, T, H) # N, B, T, H
         agents_emb = agents_emb.permute(2, 1, 0, 3) # T, B, N, H
         ################################################################
@@ -369,23 +335,12 @@ class PTR(BaseModel):
         agents_emb = self.agents_dynamic_encoder(agents_tensor).permute(1, 0, 2, 3)  # T, B, N, H
 
         ######################## Your code here ########################
-        # Apply temporal attention layers and then the social attention layers on agents_emb, each for L_enc times.
-        T, B, N, H = agents_emb.size()
-
-        # Positional encoding
-        # agents_emb = agents_emb.reshape(T, B*N, H) 
-        # agents_emb = self.pos_encoder.forward(agents_emb)
-        # agents_emb = agents_emb.reshape(T, B, N, H)
-
         
+        # Apply temporal attention layers and then the social attention layers on agents_emb, each for L_enc times.
         for d in range(self.L_enc):
-            #print(f'Before temporal: {torch.isnan(agents_emb).any().item()}')
             agents_emb = self.temporal_attn_fn(agents_emb, opps_masks, self.temporal_attn_layers[d])
-            #print(f'After temporal before social: {torch.isnan(agents_emb).any().item()}')
             agents_emb = self.social_attn_fn(agents_emb, opps_masks, self.social_attn_layers[d]) 
-            #print(f'After temporal after social: {torch.isnan(agents_emb).any().item()}')
 
-    
         ################################################################
 
         ego_soctemp_emb = agents_emb[:, :, 0]  # take ego-agent encodings only.
@@ -457,8 +412,7 @@ class PTR(BaseModel):
     def configure_optimizers(self):
         optimizer = optim.Adam(self.parameters(), lr= self.config['learning_rate'],eps=0.0001, weight_decay = self.config['weight_decay'])
         if self.config['scheduler'] == 'multistep':
-            scheduler = MultiStepLR(optimizer, milestones=self.config['learning_rate_sched'], gamma=0.5,
-                                            verbose=True)
+            scheduler = MultiStepLR(optimizer, milestones=self.config['learning_rate_sched'], gamma=0.5, verbose=True)
         elif self.config['scheduler'] == 'cos':
             scheduler = CosineAnnealingLR(optimizer, T_max=20, eta_min=0, last_epoch=-1)
         elif self.config['scheduler'] == 'warm':
