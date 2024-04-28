@@ -12,7 +12,7 @@ kl_weight: 20.0
 use_FDEADE_aux_loss: True
 
 # train
-max_epochs: 100 
+max_epochs: 300 
 learning_rate: 0.0005 # 0.00075
 learning_rate_sched: [10, 20, 30, 45, 60]
 optimizer: Adam 
