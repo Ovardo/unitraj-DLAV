@@ -1,6 +1,6 @@
 # exp setting
 exp_name: 'test'
-ckpt_path: null #/home/skjevdal/DLAV/project_new/unitraj-DLAV/motionnet/motionnet/5vxwn0m1/checkpoints/epoch=98-val/brier_fde=3.44.ckpt # /home/skjevdal/DLAV/project_new/unitraj-DLAV/motionnet/motionnet/v7lff0j7/checkpoints/epoch=91-val/brier_fde=3.59.ckpt
+ckpt_path: null #/home/skjevdal/DLAV/project_new/unitraj-DLAV/motionnet/motionnet/11/checkpoints/epoch=97-val/brier_fde=3.27.ckpt #/home/skjevdal/DLAV/project_new/unitraj-DLAV/motionnet/motionnet/5vxwn0m1/checkpoints/epoch=98-val/brier_fde=3.44.ckpt # /home/skjevdal/DLAV/project_new/unitraj-DLAV/motionnet/motionnet/v7lff0j7/checkpoints/epoch=91-val/brier_fde=3.59.ckpt
 seed: 42
 debug: False
 devices: [0]

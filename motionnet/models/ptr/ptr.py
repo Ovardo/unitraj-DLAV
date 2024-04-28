@@ -272,8 +272,9 @@ class PTR(BaseModel):
         # Apply position encoding to embbeding based on timestep
         agents_emb = self.pos_encoder.forward(agents_emb)
 
-        # Set first timestep of all masks to False as quick fix to avoid NaN from softmax
-        agent_masks[:,0,:] = False
+        # Set first timestep to False of the masks where all timestep are originally True to avoid NaN from softmax
+        idx = torch.all(agent_masks, dim=1).nonzero()
+        agent_masks[idx[:,0], 0, idx[:,1]] = False
 
         # Reshape mask to allign with shape of agents_emb 
         agent_masks = agent_masks.permute(1, 0, 2) # T, B, N
@@ -410,14 +411,26 @@ class PTR(BaseModel):
 
 
     def configure_optimizers(self):
-        optimizer = optim.Adam(self.parameters(), lr= self.config['learning_rate'],eps=0.0001, weight_decay = self.config['weight_decay'])
+        # Choose optimixer accordingly to config file
+        if self.config['optimizer'] == 'Adam':
+            optimizer = optim.Adam(self.parameters(), lr=self.config['learning_rate'],eps=0.0001, weight_decay = self.config['weight_decay'])
+        elif self.config['optimizer'] == 'SGD':
+            optimizer = optim.SGD(self.parameters(), lr=self.config['learning_rate'], weight_decay = self.config['weight_decay'])
+        
+        # Choose lr scheduler accordingly to config file
         if self.config['scheduler'] == 'multistep':
             scheduler = MultiStepLR(optimizer, milestones=self.config['learning_rate_sched'], gamma=0.5, verbose=True)
         elif self.config['scheduler'] == 'cos':
             scheduler = CosineAnnealingLR(optimizer, T_max=20, eta_min=0, last_epoch=-1)
         elif self.config['scheduler'] == 'warm':
-            pass
-            #scheduler = CosineAnnealingWarmRestarts(optimizer, )
+            scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=10, T_mult=1)
+        elif self.config['scheduler'] == 'lambda':
+            lmbda = lambda epoch: 0.9 ** epoch
+            scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lmbda)
+        elif self.config['scheduler'] == 'multiplicative': 
+            lmbda = lambda epoch: 0.97 ** epoch
+            scheduler = torch.optim.lr_scheduler.MultiplicativeLR(optimizer, lr_lambda=lmbda)
+
         return [optimizer], [scheduler]
 
 

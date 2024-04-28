@@ -6,6 +6,7 @@ motionnet/outputs/
 motionnet/motionnet/
 motionnet/tmp/
 motionnet/wandb/
+motionnet/visualizations/
 
 mjau.out
 
