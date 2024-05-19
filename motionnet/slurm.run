@@ -14,5 +14,5 @@ module load gcc python
 source ../venv/bin/activate
 wandb login 
 
-python < train.py
+python < train.py 
 #srun python generate_predictions.py method=ptr
