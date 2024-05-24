@@ -572,7 +572,7 @@ class SIMPL(BaseModel):
     def __init__(self, cfg):
         super(SIMPL, self).__init__()
         self.config = cgf # ovar
-        self.device = "cpu" if cfg.debug else "gpu"
+        self.device = torch.device('cpu') if (cfg.debug or not torch.cuda.is_available()) else torch.device("cuda", 0)
 
         self.actor_net = ActorNet(n_in=cfg['in_actor'],
                                   hidden_size=cfg['d_actor'],
