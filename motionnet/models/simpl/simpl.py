@@ -622,10 +622,57 @@ class SIMPL(BaseModel):
         """
         # TODO: enkelte funksjonaliter fra utils.utils.py i SIMPL-githuben
 
+
+
+############################################################################################################
+
         model_input = {}
         inputs = batch['input_dict']
+        agents_in, agents_mask, roads = inputs['obj_trajs'],inputs['obj_trajs_mask'] ,inputs['map_polylines']
+                            # Go from scenarionet/UNITRAJ data
+                            #     |
+                            #     |
+                            #     |
+                            #     |
+                            #     |
+                            #     |
+                            #     V
+                            # to SIMPL "argoverse" data
 
-        # data = ...
+    
+        # trajs_ctrs = data['TRAJS_CTRS']
+        # trajs_vecs = data['TRAJS_VECS']
+
+        # lane_ctrs = graph['lane_ctrs']
+        # lane_vecs = graph['lane_vecs']
+
+        trajs_ctrs = agents_in[...,:3]
+        trajs_vecs = agents_in[...,33:35]
+
+        # map_polylines:
+        # [0:3] position (x, y, z)   [3:6] direction (x, y, z) [6:9]
+        # previous point position (x,y,z) [9:29] lane type onehot encoding
+
+        lane_ctrs = roads[...,:3]
+        lane_vecs = ... # Calc vector to prev point? next point? Kein ahnung
+
+        rpes = dict()
+        scene_ctrs = torch.cat([torch.from_numpy(trajs_ctrs), torch.from_numpy(lane_ctrs)], dim=0)
+        scene_vecs = torch.cat([torch.from_numpy(trajs_vecs), torch.from_numpy(lane_vecs)], dim=0)
+        rpes['scene'], rpes['scene_mask'] = self._get_rpe(scene_ctrs, scene_vecs)
+    # obj_trajs:
+    # [0:3] position (x, y, z)   [3:6] size (l, w, h) [6:11] type_onehot [11:33]  \
+    # time_onehot [33:35] heading_encoding [35:37] vx,vy [37:39] ax,ay
+
+        data['ACTORS'] = agents_in
+        data['ACTOR_IDCS'] = agents_mask
+        data['LANES'] = roads
+        data['LANE_IDCS'] = ...
+        data['RPE'] = rpes # wrong prob
+
+############################################################################################################
+
+        data = ...
         
         data_in = self.pre_process(data)
         out = self._forward(data_in)
