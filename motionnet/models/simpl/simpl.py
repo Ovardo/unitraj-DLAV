@@ -571,7 +571,7 @@ class SIMPL(BaseModel):
     # Initialization
     def __init__(self, cfg):
         super(SIMPL, self).__init__()
-        self.config = cgf # ovar
+        self.config = cgf # Added for UniTraj
         self.device = torch.device('cpu') if (cfg.debug or not torch.cuda.is_available()) else torch.device("cuda", 0)
 
         self.actor_net = ActorNet(n_in=cfg['in_actor'],
@@ -589,12 +589,12 @@ class SIMPL(BaseModel):
         self.pred_net = MLPDecoder(device=self.device,
                                    config=cfg)
         
-        self.lossFunc = LossFunc(config, device) # ovar
+        self.lossFunc = LossFunc(cfg, device) # added for UniTraj
 
         if cfg["init_weights"]:
             self.apply(init_weights)
 
-    # Dette er den original forward() men endra den til _forward()
+    # Original forward function of the SIMPLE model
     def _forward(self, data):
         actors, actor_idcs, lanes, lane_idcs, rpe = data
 
@@ -608,7 +608,7 @@ class SIMPL(BaseModel):
 
         return out
     
-    # Denne funksjonen har jeg lagt til sjæl.
+    # UniTraj forward function 
     def forward(self, batch, batch_idx):
         """
         Forward pass for the model
@@ -618,18 +618,18 @@ class SIMPL(BaseModel):
                  'predicted_probability': (batch_size, modes),
                  'predicted_trajectory': (batch_size, modes, future_len, 2)
                  }
-                 loss (with gradient)
+                 loss (with gradient) 
         """
-        # TODO: enkelte funksjonaliter fra utils.utils.py i SIMPL-githuben
-
-
 
 ############################################################################################################
 
-        model_input = {}
-        inputs = batch['input_dict']
+        # model_input = {}
+        # inputs = batch['input_dict']
+
         agents_in, agents_mask, roads = inputs['obj_trajs'],inputs['obj_trajs_mask'] ,inputs['map_polylines']
-                            # Go from scenarionet/UNITRAJ data
+                            
+                            # TODO:
+                            # Go from scenarionet/UNITRAJ data 
                             #     |
                             #     |
                             #     |
@@ -637,7 +637,7 @@ class SIMPL(BaseModel):
                             #     |
                             #     |
                             #     V
-                            # to SIMPL "argoverse" data
+                            # to SIMPL "argoverse" data 
 
     
         # trajs_ctrs = data['TRAJS_CTRS']
@@ -660,9 +660,10 @@ class SIMPL(BaseModel):
         scene_ctrs = torch.cat([torch.from_numpy(trajs_ctrs), torch.from_numpy(lane_ctrs)], dim=0)
         scene_vecs = torch.cat([torch.from_numpy(trajs_vecs), torch.from_numpy(lane_vecs)], dim=0)
         rpes['scene'], rpes['scene_mask'] = self._get_rpe(scene_ctrs, scene_vecs)
-    # obj_trajs:
-    # [0:3] position (x, y, z)   [3:6] size (l, w, h) [6:11] type_onehot [11:33]  \
-    # time_onehot [33:35] heading_encoding [35:37] vx,vy [37:39] ax,ay
+    
+        # obj_trajs:
+        # [0:3] position (x, y, z)   [3:6] size (l, w, h) [6:11] type_onehot [11:33]  \
+        # time_onehot [33:35] heading_encoding [35:37] vx,vy [37:39] ax,ay
 
         data['ACTORS'] = agents_in
         data['ACTOR_IDCS'] = agents_mask
@@ -671,9 +672,10 @@ class SIMPL(BaseModel):
         data['RPE'] = rpes # wrong prob
 
 ############################################################################################################
-
-        data = ...
         
+        # If the data-dictionary input to the self.pre_process() is on the correct 
+        # format then the rest should give correct results (not been able to test though)
+
         data_in = self.pre_process(data)
         out = self._forward(data_in)
         out_post = self.post_process(out)
@@ -725,6 +727,7 @@ class SIMPL(BaseModel):
         return loss
 
     def configure_optimizers(self):
+       
         if self.config['lr_scale_func'] == 'linear':
             opt_cfg['lr_scale'] = self.world_size
         elif self.config['lr_scale_func'] == 'sqrt':

@@ -7,6 +7,9 @@ import numpy as np
 import torch
 from torch.optim.lr_scheduler import _LRScheduler
 
+"""
+Copied from 
+"""
 
 class PolylineLR(_LRScheduler):
     def __init__(self, optimizer, milestones, values, last_epoch=-1, verbose=False):
@@ -124,10 +127,10 @@ class Optimizer(object):
         else:
             assert False, 'unknown scheduler type, should be cosine/step/none'
     
-    def get_optimizer(): # ovar
+    def get_optimizer(): # Added for UniTraj
         return self.opt
     
-    def get_scheduler(): # ovar
+    def get_scheduler(): # Added for UniTraj
         return self.scheduler
 
     def zero_grad(self):

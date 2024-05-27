@@ -1,8 +1,7 @@
 import os
 import sys
 
-# TODO: Gjøre denne configgen om til yaml-format (no ala ptr.yaml) slik at det er kompatible med train.py, 
-#       vil nok også bety at stedene AdvCfg blir brukt i simpl.py må tilpassed deretter
+# TODO: "Original config class from SIMPL-github, this has been converted to yaml in simpl.yaml"
 
 class AdvCfg():
     def __init__(self):

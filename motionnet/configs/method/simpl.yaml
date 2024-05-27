@@ -7,7 +7,7 @@ g_obs_len: 50
 g_pred_len: 60
 
 # dataset
-dataset: "simpl.av2_dataset:AV2Dataset"
+dataset: "simpl.av2_dataset:AV2Dataset" # 
 
 # network
 network: "simpl.simpl:Simpl"
